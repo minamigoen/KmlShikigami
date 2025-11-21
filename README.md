@@ -6,6 +6,9 @@
 [![License: CC BY 4.0](https://img.shields.io/badge/License-CC%20BY%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by/4.0/deed.ja)
 ![Platform](https://img.shields.io/badge/platform-Google_Apps_Script-blue)
 
+> 📖 **詳しい使い方は Note 記事をご覧ください:**
+> [【完成】API不要でGoogleマイマップを全自動生成する「KML式神」を召喚してみた（Gemini × GAS）](https://note.com/_cop/n/n6c996826de5b)
+
 ---
 
 ## 📖 概要 (Overview)
