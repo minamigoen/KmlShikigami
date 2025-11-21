@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html>
+<head>
+<base target="_top">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KML式神 v24</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Noto+Sans+JP:wght@400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<style>
+ :root {
+  --bg-app: #0a0c10; --bg-panel: #111318; --bg-input: #1a1d24; --border: #2a2f3a;
+  --text: #e0e6ed; --text-muted: #7a8a99;
+  --teal: #0091A9; --teal-hover: #00abc7; --teal-glow: rgba(0, 145, 169, 0.4);
+  --purple: #a855f7; --purple-glow: rgba(168, 85, 247, 0.5);
+  --success: #00c853; --error: #ff5252;
+ }
+ * { box-sizing: border-box; outline: none; }
+ body { margin: 0; padding: 0; font-family: 'Inter', 'Noto Sans JP', sans-serif; background: var(--bg-app); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+ header { height: 50px; flex-shrink: 0; background: rgba(17, 19, 24, 0.9); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; backdrop-filter: blur(10px); z-index: 100; }
+ .brand { display: flex; align-items: center; gap: 10px; }
+ .brand h1 { font-size: 1.1rem; font-weight: 700; margin: 0; letter-spacing: 0.05em; color: #fff; }
+ .brand .icon { color: var(--teal); font-size: 1.2rem; filter: drop-shadow(0 0 8px var(--teal-glow)); }
+ .brand .ver { font-size: 0.65rem; background: linear-gradient(135deg, var(--teal), var(--purple)); padding: 2px 6px; border-radius: 4px; color: #fff; font-family: 'JetBrains Mono'; font-weight: bold; box-shadow: 0 0 8px rgba(168, 85, 247, 0.4); }
+ 
+ .header-actions { display: flex; gap: 10px; align-items: center; }
+ .icon-btn { background: transparent; border: 1px solid var(--border); color: var(--text-muted); width: 30px; height: 30px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+ .icon-btn:hover { color: var(--teal); border-color: var(--teal); background: rgba(0, 145, 169, 0.1); }
+
+ .workspace { display: flex; flex: 1; overflow: hidden; position: relative; }
+ .panel-left { width: 420px; min-width: 300px; max-width: 80vw; display: flex; flex-direction: column; background: var(--bg-panel); border-right: 1px solid var(--border); z-index: 10; }
+ .panel-right { flex: 1; position: relative; background: #050505; z-index: 1; }
+ #map { width: 100%; height: 100%; z-index: 0; background: #0a0c10; }
+ .resizer { position: absolute; left: 420px; top: 0; bottom: 0; width: 10px; margin-left: -5px; cursor: col-resize; z-index: 20; display: flex; justify-content: center; }
+ .resizer::after { content: ''; width: 1px; height: 100%; background: transparent; transition: 0.2s; }
+ .resizer:hover::after, .resizer.active::after { background: var(--teal); box-shadow: 0 0 8px var(--teal); }
+
+ .stepper { display: flex; background: var(--bg-input); border-bottom: 1px solid var(--border); }
+ .step-tab { flex: 1; padding: 12px; text-align: center; cursor: pointer; font-size: 0.8rem; color: var(--text-muted); border-bottom: 2px solid transparent; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+ .step-tab:hover { color: var(--text); background: rgba(255,255,255,0.02); }
+ .step-tab.active { color: var(--teal); border-bottom-color: var(--teal); background: rgba(0, 145, 169, 0.05); font-weight: 600; }
+ .step-badge { width: 18px; height: 18px; border-radius: 50%; background: var(--border); color: var(--text-muted); font-size: 0.65rem; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+ .step-tab.active .step-badge { background: var(--teal); color: #000; }
+
+ .panel-content { flex: 1; display: none; flex-direction: column; padding: 15px; overflow: hidden; }
+ .panel-content.active { display: flex; animation: fadeUp 0.3s ease; }
+ @keyframes fadeUp { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+ .ai-section { background: linear-gradient(135deg, rgba(168, 85, 247, 0.15), transparent); border: 1px solid rgba(168, 85, 247, 0.4); padding: 15px; border-radius: 8px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px; }
+ .ai-title { font-size: 0.8rem; color: var(--purple); font-weight: 800; display: flex; align-items: center; gap: 6px; letter-spacing: 0.05em; }
+ .btn-gem { background: var(--bg-panel); border: 1px solid var(--purple); color: var(--text); padding: 10px; border-radius: 6px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: 0.2s; text-decoration: none; }
+ .btn-gem:hover { background: var(--purple); color: white; box-shadow: 0 0 20px var(--purple-glow); }
+
+ textarea.code-editor { flex: 1; background: var(--bg-input); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 15px; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; resize: none; line-height: 1.5; transition: 0.2s; }
+ textarea.code-editor:focus { border-color: var(--teal); box-shadow: 0 0 0 2px var(--teal-dim); }
+ .input-status { text-align: right; font-size: 0.7rem; color: var(--text-muted); margin-top: 5px; min-height: 1rem; }
+
+ .grid-tools { display: flex; gap: 10px; margin-bottom: 10px; }
+ .table-container { flex: 1; overflow: auto; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-app); }
+ table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+ th { position: sticky; top: 0; background: #15171e; color: var(--teal); padding: 8px; text-align: left; border-bottom: 1px solid var(--border); z-index: 5; white-space: nowrap; }
+ td { border-bottom: 1px solid var(--border); padding: 4px; vertical-align: top; }
+ input.data-input, textarea.data-input { width: 100%; background: transparent; border: 1px solid transparent; color: var(--text); padding: 4px 6px; border-radius: 3px; font-family: inherit; font-size: 0.85rem; }
+ input.data-input:focus, textarea.data-input:focus { background: #000; border-color: var(--teal); }
+ textarea.data-input { resize: vertical; min-height: 32px; }
+ .icon-trigger { display: flex; align-items: center; gap: 6px; cursor: pointer; padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg-panel); font-size: 0.75rem; width: 100%; transition: 0.2s; }
+ .icon-trigger:hover { border-color: var(--teal); background: var(--teal-dim); }
+ .icon-trigger img { width: 18px; height: 18px; object-fit: contain; }
+ .del-btn { color: var(--text-muted); cursor: pointer; padding: 6px; text-align: center; } .del-btn:hover { color: var(--error); }
+
+ .footer-actions { padding: 15px; border-top: 1px solid var(--border); background: var(--bg-panel); display: flex; flex-direction: column; gap: 12px; }
+ .save-options { display: flex; align-items: center; gap: 10px; font-size: 0.8rem; color: var(--text-muted); background: var(--bg-input); padding: 8px; border-radius: 6px; border: 1px solid var(--border); }
+ .save-options input[type="text"] { flex: 1; background: transparent; border: none; color: var(--text); outline: none; margin-left: 5px; }
+ .toggle-switch { position: relative; width: 32px; height: 18px; background: #444; border-radius: 18px; cursor: pointer; transition: 0.3s; }
+ .toggle-switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; background: #fff; border-radius: 50%; transition: 0.3s; }
+ input[type="checkbox"] { display: none; }
+ input[type="checkbox"]:checked + .toggle-switch { background: var(--teal); }
+ input[type="checkbox"]:checked + .toggle-switch::after { transform: translateX(14px); }
+ .main-actions { display: flex; gap: 10px; }
+ .btn { padding: 10px 16px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-weight: 600; border: 1px solid var(--border); background: var(--bg-input); color: var(--text); display: flex; align-items: center; justify-content: center; gap: 8px; transition: 0.2s; text-decoration: none; }
+ .btn:hover { border-color: var(--text-muted); background: rgba(255,255,255,0.05); }
+ .btn-primary { background: var(--teal); border-color: var(--teal); color: #fff; flex: 2; box-shadow: 0 4px 15px var(--teal-glow); }
+ .btn-primary:hover { background: var(--teal-hover); box-shadow: 0 6px 20px var(--teal-glow); transform: translateY(-1px); }
+ .btn-primary:disabled { background: var(--border); color: #555; box-shadow: none; cursor: not-allowed; transform: none; }
+ .btn-sub { flex: 1; color: var(--text-muted); }
+ .status-bar { font-family: 'JetBrains Mono'; font-size: 0.75rem; color: var(--text-muted); text-align: center; min-height: 1.2em; display: flex; justify-content: space-between; }
+
+ /* Icon Modal (Fixed) */
+ .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; backdrop-filter: blur(4px); justify-content: center; align-items: center; }
+ .modal-window { background: var(--bg-panel); width: 550px; max-width: 90%; border-radius: 12px; border: 1px solid var(--purple); box-shadow: 0 0 40px var(--purple-glow); overflow: hidden; display: flex; flex-direction: column; max-height: 80vh; }
+ .modal-header { padding: 15px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--bg-input); }
+ .modal-body { padding: 20px; overflow-y: auto; }
+ .icon-tabs { display: flex; gap: 5px; margin-bottom: 15px; }
+ .icon-cat { flex: 1; padding: 8px; border: 1px solid var(--border); background: var(--bg-app); color: var(--text-muted); font-size: 0.75rem; cursor: pointer; border-radius: 4px; text-align: center; transition: 0.2s; }
+ .icon-cat:hover { color: var(--text); border-color: var(--text-muted); }
+ .icon-cat.active { color: var(--teal); border-color: var(--teal); background: rgba(0, 145, 169, 0.1); font-weight: bold; }
+ .icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(50px, 1fr)); gap: 10px; padding-bottom: 10px; }
+ .icon-item { width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; background: var(--bg-input); transition: 0.2s; }
+ .icon-item:hover { border-color: var(--purple); background: rgba(178, 75, 243, 0.2); transform: scale(1.1); }
+
+ @media (max-width: 900px) { .workspace { flex-direction: column-reverse; } .panel-left { width: 100%; height: 60%; } .resizer { display: none; } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <span class="icon">🛰️</span>
+    <h1>KML式神</h1>
+    <span class="ver">v24</span>
+  </div>
+  <div class="header-actions">
+    <button class="icon-btn" id="splitToggle" onclick="toggleLayout()" title="画面分割切替">◫</button>
+    <button class="icon-btn" onclick="openHelpModal()">?</button>
+  </div>
+</header>
+
+<div class="workspace" id="workspace">
+  <div class="panel-left" id="leftPanel">
+    <div class="stepper">
+      <div class="step-tab active" onclick="switchStep('step1')" id="tab-step1"><div class="step-badge">1</div> AI & JSON</div>
+      <div class="step-tab" onclick="switchStep('step2')" id="tab-step2"><div class="step-badge">2</div> リスト編集</div>
+    </div>
+
+    <div id="step1" class="panel-content active">
+      <div class="ai-section">
+        <div class="ai-title"><span>✨</span> AI DESIGNER</div>
+        <a href="<?= gemUrl ?>" target="_blank" class="btn-gem">Gemプロンプトを開く</a>
+      </div>
+      <textarea id="jsonInput" class="code-editor" placeholder='JSONを貼り付けると自動で反映されます...'></textarea>
+      <div class="input-status" id="jsonStatus">待機中...</div>
+    </div>
+
+    <div id="step2" class="panel-content">
+      <div class="grid-tools">
+        <button class="btn util-btn" style="flex:1; font-size:0.8rem; padding:6px;" onclick="openBulkModal()">⚡ 一括変更</button>
+        <button class="btn util-btn" style="flex:1; font-size:0.8rem; padding:6px;" onclick="copyToClipboard()">📋 コピー</button>
+      </div>
+      <div class="table-container">
+        <table id="dataTable">
+          <thead><tr><th width="30%">名前</th><th width="35%">説明</th><th width="20%">座標</th><th width="10%">Icon</th><th width="5%"></th></tr></thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+        <div id="emptyMsg" style="padding:40px; text-align:center; color:var(--text-muted); font-size:0.85rem;">データがありません</div>
+      </div>
+    </div>
+
+    <div class="footer-actions">
+      <div class="save-options">
+        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+          <input type="checkbox" id="folderToggle">
+          <div class="toggle-switch"></div>
+          <span>保存先指定</span>
+        </label>
+        <input type="text" id="folderUrl" placeholder="GoogleドライブのフォルダURL..." disabled>
+      </div>
+      <div class="main-actions">
+        <button class="btn btn-sub" onclick="exportSheet()">📤 Sheet</button>
+        <button class="btn btn-primary" id="buildBtn" onclick="startBuild()">KMLデータを構築</button>
+      </div>
+      <div class="status-bar">
+        <span id="statusMsg">Ready</span>
+        <div id="resultLinks" style="display:flex; gap:10px; margin-left:auto;"></div>
+      </div>
+    </div>
+  </div>
+  <div class="resizer" id="resizer"></div>
+  <div class="panel-right" id="rightPanel">
+    <div id="map"></div>
+    <div style="position:absolute; bottom:20px; left:20px; z-index:999; background:rgba(0,0,0,0.8); border:1px solid var(--teal); padding:6px 12px; border-radius:20px; font-size:0.75rem; color:#fff; pointer-events:none; box-shadow: 0 0 10px var(--teal-glow);">
+      <span style="color:var(--teal);">●</span> ピンをドラッグして位置修正
+    </div>
+  </div>
+</div>
+
+<div id="iconModal" class="modal-overlay" onclick="if(event.target===this) closeIconModal()">
+  <div class="modal-window">
+    <div class="modal-header"><strong>アイコン選択</strong><button onclick="closeIconModal()" style="background:none; border:none; color:var(--text); cursor:pointer; font-size:1.2rem;">×</button></div>
+    <div class="modal-body">
+      <div class="icon-tabs">
+        <div class="icon-cat active" onclick="filterIcons('pushpin', this)">ピン</div>
+        <div class="icon-cat" onclick="filterIcons('paddle', this)">パドル</div>
+        <div class="icon-cat" onclick="filterIcons('shape', this)">スポット</div>
+        <div class="icon-cat" onclick="filterIcons('japan', this)">日本</div>
+      </div>
+      <div class="icon-grid" id="iconGrid"></div>
+    </div>
+  </div>
+</div>
+
+<div id="helpModal" class="modal-overlay" onclick="if(event.target===this) closeModal('helpModal')">
+  <div class="modal-window">
+    <div class="modal-header"><strong style="color:var(--teal);">使い方ガイド</strong><button onclick="closeModal('helpModal')" style="background:none; border:none; color:var(--text); cursor:pointer; font-size:1.2rem;">×</button></div>
+    <div class="modal-body">
+      <div class="help-step"><div class="help-badge">1</div><div class="help-text"><h4>JSON貼付</h4><p>Geminiで作ったJSONを貼り付けると、自動で反映されます。</p></div></div>
+      <div class="help-step"><div class="help-badge">2</div><div class="help-text"><h4>修正・編集</h4><p>リスト編集や、地図のピンドラッグで調整します。</p></div></div>
+      <div class="help-step"><div class="help-badge">3</div><div class="help-text"><h4>保存</h4><p>「KMLデータを構築」でドライブに保存し、マイマップへ。</p></div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let jsonData = { places: [] };
+  let map, markers = [];
+  let currentRowIndex = -1;
+  let isBulkMode = false;
+  let isUpdating = false;
+
+  window.onload = () => {
+    setTimeout(initMap, 200);
+    setupResizer();
+    document.getElementById('folderToggle').addEventListener('change', (e) => {
+       const input = document.getElementById('folderUrl');
+       input.disabled = !e.target.checked;
+       if(!e.target.checked) input.value = ''; else input.focus();
+    });
+    document.getElementById('jsonInput').addEventListener('input', debounce(autoLoadJson, 500));
+  };
+
+  function debounce(func, wait) {
+    let timeout;
+    return function(...args) { clearTimeout(timeout); timeout = setTimeout(() => func.apply(this, args), wait); };
+  }
+
+  function autoLoadJson() {
+    const txt = document.getElementById('jsonInput').value.trim();
+    const statusEl = document.getElementById('jsonStatus');
+    if (!txt) { statusEl.innerText = "待機中..."; statusEl.style.color = "var(--text-muted)"; return; }
+    try {
+      const parsed = JSON.parse(txt);
+      if (parsed && Array.isArray(parsed.places)) {
+        jsonData = parsed;
+        renderTable(); renderMap();
+        statusEl.innerText = "✅ 反映完了 (" + parsed.places.length + "件)";
+        statusEl.style.color = "var(--success)";
+      } else { throw new Error(); }
+    } catch (e) { statusEl.innerText = "⚠ 解析中..."; statusEl.style.color = "var(--text-muted)"; }
+  }
+
+  function switchStep(stepId) {
+    document.querySelectorAll('.panel-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.step-tab').forEach(el => el.classList.remove('active'));
+    document.getElementById(stepId).classList.add('active');
+    document.getElementById('tab-' + stepId).classList.add('active');
+    if(stepId === 'step2') setTimeout(() => map.invalidateSize(), 200);
+  }
+
+  function setupResizer() {
+    const resizer = document.getElementById('resizer');
+    const left = document.getElementById('leftPanel');
+    let isResizing = false;
+    resizer.addEventListener('mousedown', () => { isResizing = true; document.body.style.cursor = 'col-resize'; });
+    document.addEventListener('mouseup', () => { isResizing = false; document.body.style.cursor = 'default'; map.invalidateSize(); });
+    document.addEventListener('mousemove', (e) => {
+      if(!isResizing) return;
+      const w = e.clientX;
+      if(w > 250 && w < window.innerWidth - 100) {
+         left.style.width = w + 'px';
+         resizer.style.left = w + 'px';
+      }
+    });
+  }
+
+  let isSplit = false;
+  function toggleLayout() {
+    const left = document.getElementById('leftPanel');
+    const resizer = document.getElementById('resizer');
+    isSplit = !isSplit;
+    if(isSplit) { left.style.width = "50%"; resizer.style.left = "50%"; } else { left.style.width = "420px"; resizer.style.left = "420px"; }
+    setTimeout(() => map.invalidateSize(), 300);
+  }
+
+  function initMap() {
+    if (typeof L === 'undefined') return;
+    const osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19});
+    const photo = L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg', {maxZoom:18});
+    map = L.map('map', { center: [36.5, 138], zoom: 5, layers: [photo] });
+    L.control.layers({ "航空写真": photo, "標準地図": osm }).addTo(map);
+  }
+
+  function renderMap() {
+    if(isUpdating) return;
+    isUpdating = true;
+    markers.forEach(m => map.removeLayer(m));
+    markers = [];
+
+    jsonData.places.forEach((p, i) => {
+      if(p.lat && p.lng) {
+        const iconUrl = resolveIconUrl(p.icon);
+        const icon = L.icon({ iconUrl: iconUrl, iconSize: [32, 32], iconAnchor: [16, 32], popupAnchor: [0, -32] });
+        const m = L.marker([p.lat, p.lng], { draggable: true, icon: icon }).addTo(map);
+        m.bindPopup(`<b>${esc(p.name)}</b>`);
+        m.on('dragend', (e) => {
+          const pos = m.getLatLng();
+          jsonData.places[i].lat = parseFloat(pos.lat.toFixed(6));
+          jsonData.places[i].lng = parseFloat(pos.lng.toFixed(6));
+          renderTable(); // Sync Grid
+          document.getElementById('jsonInput').value = JSON.stringify(jsonData, null, 2); // Sync JSON
+          document.getElementById('statusMsg').innerText = `📍 位置修正: ${p.name}`;
+        });
+        markers.push(m);
+      }
+    });
+    if(markers.length) { const group = new L.featureGroup(markers); map.fitBounds(group.getBounds(), {padding:[50,50]}); }
+    isUpdating = false;
+  }
+
+  function renderTable() {
+    const tbody = document.getElementById('tableBody');
+    tbody.innerHTML = '';
+    document.getElementById('emptyMsg').style.display = jsonData.places.length ? 'none' : 'block';
+
+    jsonData.places.forEach((p, i) => {
+      const tr = document.createElement('tr');
+      const iconUrl = resolveIconUrl(p.icon);
+      tr.innerHTML = `
+        <td><input class="data-input" value="${esc(p.name)}" onchange="updateData(${i},'name',this.value)"></td>
+        <td><textarea class="data-input" onchange="updateData(${i},'description',this.value)">${esc(p.description)}</textarea></td>
+        <td>
+           <input class="data-input" type="number" step="0.000001" value="${p.lat}" onchange="updateData(${i},'lat',this.value)" style="font-size:0.75rem;">
+           <input class="data-input" type="number" step="0.000001" value="${p.lng}" onchange="updateData(${i},'lng',this.value)" style="font-size:0.75rem; margin-top:2px;">
+        </td>
+        <td><div class="icon-trigger" onclick="openIconModal(${i})"><img src="${iconUrl}"></div></td>
+        <td style="vertical-align:middle;"><div class="del-btn" onclick="deleteRow(${i})">×</div></td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function updateData(i, key, val) {
+    if(key==='lat'||key==='lng') val = parseFloat(val).toFixed(6);
+    jsonData.places[i][key] = val;
+    if(!isUpdating) { renderMap(); document.getElementById('jsonInput').value = JSON.stringify(jsonData, null, 2); }
+  }
+
+  function deleteRow(i) {
+    if(confirm("削除しますか？")) {
+      jsonData.places.splice(i, 1);
+      renderTable(); renderMap();
+      document.getElementById('jsonInput').value = JSON.stringify(jsonData, null, 2);
+    }
+  }
+
+  // --- Fixed Icons ---
+  const ICONS = {
+    pushpin: ['yellow','red','blue','green','purple','pink','white'],
+    paddle: ['yellow','red','blue','green','purple','pink','white'],
+    shape: ['dining','coffee','bars','shopping','hiker','camera','gas_stations','parking_lot','bus','rail','tram','airports','ferry','lodging','campground','toilets','info','star','placemark_circle'],
+    japan: ['schools','hospitals','post_office','police','firedept','convenience','yen','library','museum','mechanic']
+  };
+
+  function resolveIconUrl(iconId) {
+    if(!iconId) iconId = 'pushpin-yellow';
+    const parts = iconId.split('-');
+    const type = parts[0]; const val = parts[1];
+    // Google Maps File Path (Stable)
+    const base = "http://maps.google.com/mapfiles/kml";
+    const colorMap = {'yellow':'ylw','red':'red','blue':'blue','green':'grn','purple':'purple','pink':'pink','white':'wht'};
+    const cCode = colorMap[val] || val;
+
+    if(type === 'pushpin') return `${base}/pushpin/${cCode}-pushpin.png`;
+    if(type === 'paddle') {
+        let pCode = cCode; if(cCode==='blue') pCode='blu';
+        return `${base}/paddle/${pCode}-blank.png`;
+    }
+    if(type === 'shape' || type === 'japan') return `${base}/shapes/${val}.png`;
+    
+    return `${base}/pushpin/ylw-pushpin.png`;
+  }
+
+  function openIconModal(idx) { currentRowIndex = idx; isBulkMode = false; document.getElementById('iconModal').style.display='flex'; filterIcons('pushpin'); }
+  function openBulkModal() { isBulkMode = true; document.getElementById('iconModal').style.display='flex'; filterIcons('pushpin'); }
+  function closeIconModal() { document.getElementById('iconModal').style.display='none'; }
+
+  function filterIcons(cat, btn) {
+    if(btn) {
+      document.querySelectorAll('.icon-cat').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    } else {
+      document.querySelectorAll('.icon-cat').forEach(b => b.classList.remove('active'));
+      document.querySelector('.icon-cat').classList.add('active');
+    }
+    const grid = document.getElementById('iconGrid');
+    grid.innerHTML = '';
+    ICONS[cat].forEach(val => {
+      const div = document.createElement('div');
+      div.className = 'icon-item';
+      let id = (cat==='japan' || cat==='shape') ? `shape-${val}` : `${cat}-${val}`;
+      if(cat==='japan') id = `japan-${val}`;
+
+      div.innerHTML = `<img src="${resolveIconUrl(id)}">`;
+      div.onclick = () => applyIcon(id);
+      grid.appendChild(div);
+    });
+  }
+
+  function applyIcon(id) {
+    if(isBulkMode) {
+      jsonData.places.forEach(p => p.icon = id);
+    } else {
+      jsonData.places[currentRowIndex].icon = id;
+    }
+    renderTable(); renderMap();
+    document.getElementById('jsonInput').value = JSON.stringify(jsonData, null, 2);
+    closeIconModal();
+  }
+
+  function startBuild() {
+    const btn = document.getElementById('buildBtn');
+    btn.disabled = true; 
+    let st = Date.now();
+    let tm = setInterval(() => { document.getElementById('statusMsg').innerText = `処理中... (${((Date.now()-st)/1000).toFixed(1)}s)`; }, 100);
+    
+    // Folder Logic: OFF->null, ON+Empty->"", ON+URL->"url"
+    const toggle = document.getElementById('folderToggle').checked;
+    const val = document.getElementById('folderUrl').value;
+    let folderParam = null;
+    if(toggle) folderParam = val || "";
+
+    google.script.run.withSuccessHandler(r1 => {
+       if(r1.success) {
+         google.script.run.withSuccessHandler(r2 => {
+            clearInterval(tm);
+            if(r2.success) {
+              document.getElementById('resultLinks').innerHTML = `
+                <a href="${r2.downloadUrl}" target="_blank" class="btn btn-sm" style="color:var(--teal);padding:4px 8px;">⬇️ DL</a>
+                <a href="${r2.folderUrl}" target="_blank" class="btn btn-sm" style="color:var(--teal);padding:4px 8px;">📂 Dir</a>
+                <a href="https://www.google.com/maps/d/u/0/" target="_blank" class="btn btn-sm" style="color:var(--teal);padding:4px 8px;">🗺️ Map</a>`;
+              document.getElementById('statusMsg').innerText = "✔ 完了";
+            } else { document.getElementById('statusMsg').innerText = "エラー: " + r2.message; }
+            btn.disabled = false; 
+         }).createKmlFromSheet(r1.mapId, folderParam);
+       } else { clearInterval(tm); document.getElementById('statusMsg').innerText = "保存エラー"; btn.disabled = false; }
+    }).saveMapData(JSON.stringify(jsonData));
+  }
+
+  function exportSheet() {
+    const btn = event.target; btn.innerText = "出力中...";
+    google.script.run.withSuccessHandler(res => {
+      if(res.success) window.open(res.url, '_blank');
+      else alert(res.message);
+      btn.innerText = "📤 Sheet";
+    }).exportToNewSheet(JSON.stringify(jsonData));
+  }
+
+  function openHelpModal() { document.getElementById('helpModal').style.display='flex'; }
+  function closeModal(id) { document.getElementById(id).style.display='none'; }
+  function esc(t) { return t ? t.toString().replace(/"/g, "") : ""; }
+  
+  function copyToClipboard() {
+    let tsv = "";
+    jsonData.places.forEach(p => { tsv += `${p.name}\t${p.lat}\t${p.lng}\n`; });
+    navigator.clipboard.writeText(tsv).then(() => document.getElementById('statusMsg').innerText = "📋 コピーしました");
+  }
+</script>
+</body>
+</html>
