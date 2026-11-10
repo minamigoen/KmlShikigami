@@ -1,0 +1,2 @@
+# Keep local Claude Code approval rules out of version control.
+**/.claude/settings.local.json
